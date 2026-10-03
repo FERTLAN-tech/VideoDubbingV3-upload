@@ -1,0 +1,4 @@
+openai>=1.60
+yt-dlp[default]>=2025.11.12
+numpy>=1.26
+flask>=3.0

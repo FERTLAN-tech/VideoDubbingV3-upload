@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Dubbing V3</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M12 9v14l11-7z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M12 9v14l11-7z"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">Video Dubbing <span class="ver">V3</span></div>
+      <div class="brand-sub" data-i18n="tagline">YouTube → dubbed MP4</div>
+    </div>
+  </div>
+
+  <div class="spend" aria-label="Spend">
+    <div class="spend-head">
+      <span class="spend-title" data-i18n="spend_title">Spend (estimate)</span>
+      <div class="seg-control" role="tablist" id="spend-tabs">
+        <button data-view="job" class="active" data-i18n="spend_job">This job</button>
+        <button data-view="month" data-i18n="spend_month">This month</button>
+        <button data-view="all" data-i18n="spend_all">All time</button>
+      </div>
+    </div>
+    <div class="spend-tiles">
+      <div class="tile role-analysis" title=""><span class="dot"></span><div><div class="tile-label" data-i18n="role_analysis">Analysis</div><div class="tile-value" id="spend-analysis">$0.00</div></div></div>
+      <div class="tile role-script"><span class="dot"></span><div><div class="tile-label" data-i18n="role_script">Script</div><div class="tile-value" id="spend-script">$0.00</div></div></div>
+      <div class="tile role-voice"><span class="dot"></span><div><div class="tile-label" data-i18n="role_voice">Voice</div><div class="tile-value" id="spend-voice">$0.00</div></div></div>
+      <div class="tile role-total"><div><div class="tile-label" data-i18n="total">Total</div><div class="tile-value" id="spend-total">$0.00</div></div></div>
+    </div>
+    <div class="spend-savings" id="spend-savings" hidden></div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" data-tab="dub"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span data-i18n="nav_dub">Dub a video</span></button>
+    <button class="nav-btn" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7zm7.4-2.5.1-1-.1-1 2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.6a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11l-.1 1 .1 1-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5z"/></svg><span data-i18n="nav_settings">Settings</span></button>
+    <div class="lang-toggle" title="Language / Langue">
+      <button data-lang="en">EN</button><button data-lang="fr">FR</button>
+    </div>
+    <button class="btn-quit" id="quit-btn" data-i18n="quit">Quit</button>
+  </nav>
+</header>
+
+<div class="banner banner-test" id="fake-banner" hidden data-i18n="fake_banner">Offline test mode: fake AI and a generated test video. No API calls, no real cost.</div>
+
+<main>
+<!-- ================================================================ DUB -->
+<section id="view-dub" class="view">
+  <div class="layout">
+    <div class="col-left">
+      <div class="card" id="start-card">
+        <h2 data-i18n="new_title">New dubbing</h2>
+        <label class="field">
+          <span data-i18n="url_label">YouTube video URL</span>
+          <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span data-i18n="lang_label">Target language</span>
+          <select id="language"></select>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" id="review-toggle">
+          <span class="switch" aria-hidden="true"></span>
+          <span><b data-i18n="review_label">Review script before voicing</b><br><small data-i18n="review_hint">Pause after translation so you can edit each line.</small></span>
+        </label>
+        <div class="start-actions">
+          <button class="btn btn-primary btn-lg" id="start-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span data-i18n="start">START</span></button>
+          <button class="btn btn-danger-ghost" id="cancel-btn" hidden data-i18n="cancel">Cancel</button>
+        </div>
+        <div class="form-error" id="start-error" hidden></div>
+      </div>
+
+      <div class="card" id="pipeline-card">
+        <div class="card-head">
+          <h2 data-i18n="pipeline_title">Pipeline</h2>
+          <span class="status-pill" id="job-status-pill" data-status="idle" data-i18n="status_idle">Ready</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+          <div class="progress-info"><span id="progress-msg" data-i18n="progress_idle">Waiting for a video.</span><span id="progress-pct">0%</span></div>
+          <div class="progress-elapsed" id="job-elapsed"></div>
+        </div>
+        <ol class="stages" id="stages"></ol>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="card card-error" id="error-card" hidden>
+        <div class="error-icon">!</div>
+        <div>
+          <h3 id="error-title" data-i18n="error_title">Something went wrong</h3>
+          <p id="error-msg"></p>
+          <div class="row-actions">
+            <button class="btn" id="error-settings-btn" data-i18n="open_settings">Open Settings</button>
+            <button class="btn btn-ghost" id="error-close-btn" data-i18n="close">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-result" id="result-card" hidden>
+        <div class="result-head">
+          <div class="result-check">✓</div>
+          <div>
+            <h2 data-i18n="final_ready">FINAL VIDEO READY</h2>
+            <div class="muted" id="result-title"></div>
+          </div>
+          <div class="result-cost" id="result-cost"></div>
+        </div>
+        <div class="result-savings" id="result-savings" hidden></div>
+        <video id="result-video" controls preload="metadata"></video>
+        <div class="row-actions">
+          <a class="btn btn-primary" id="dl-mp4" href="#" download><svg class="stroke" viewBox="0 0 24 24"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg><span data-i18n="dl_mp4">Download MP4</span></a>
+          <a class="btn" id="dl-srt" href="#" download data-i18n="dl_srt">Subtitles (SRT)</a>
+          <a class="btn" id="dl-json" href="#" download data-i18n="dl_json">Timing report (JSON)</a>
+          <button class="btn" id="open-folder-btn" data-i18n="open_folder">Open output folder</button>
+        </div>
+        <div class="path-box"><span data-i18n="saved_in">Saved in</span> <code id="result-path"></code></div>
+        <details class="checks">
+          <summary><span data-i18n="quality_checks">Quality checks</span> <span id="checks-count" class="muted"></span></summary>
+          <ul id="checks-list"></ul>
+        </details>
+        <div class="row-actions end"><button class="btn btn-ghost" id="new-job-btn" data-i18n="new_video">New video</button></div>
+      </div>
+
+      <div class="card card-review" id="review-card" hidden>
+        <div>
+          <h3 data-i18n="review_title">Review the script</h3>
+          <p data-i18n="review_text">The translation is ready. Edit any line in the table below, then click Continue to generate the voice.</p>
+        </div>
+        <button class="btn btn-primary" id="review-continue" data-i18n="continue">Continue</button>
+      </div>
+
+      <div class="card" id="video-card" hidden>
+        <div class="card-head"><h2 data-i18n="video_title">Video analysis</h2></div>
+        <div class="chips" id="video-chips"></div>
+      </div>
+
+      <div class="card" id="segments-card">
+        <div class="card-head">
+          <h2 data-i18n="segments_title">Speech segments</h2>
+          <span class="muted" id="segments-count"></span>
+        </div>
+        <div class="empty" id="segments-empty" data-i18n="segments_empty">The parts of the video appear here after the transcription.</div>
+        <div id="segments-body" hidden>
+          <div class="timeline-wrap">
+            <div class="timeline" id="timeline"></div>
+            <div class="timeline-axis" id="timeline-axis"></div>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="table-wrap">
+            <table class="seg-table">
+              <thead><tr>
+                <th>#</th><th data-i18n="col_time">Time</th><th data-i18n="col_slot">Slot</th>
+                <th data-i18n="col_source">Original</th><th data-i18n="col_translation">Translation</th>
+                <th data-i18n="col_voice">Voice</th><th data-i18n="col_speed">Speed</th><th data-i18n="col_mode">Timing</th><th></th>
+              </tr></thead>
+              <tbody id="seg-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <details class="card log-card" id="log-card">
+        <summary><h2 data-i18n="log_title">Live log</h2><span class="muted" id="log-count"></span></summary>
+        <pre class="log" id="log"></pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================== SETTINGS -->
+<section id="view-settings" class="view" hidden>
+  <div class="settings">
+    <div class="card">
+      <h2 data-i18n="keys_title">OpenAI API keys</h2>
+      <p class="muted" data-i18n="keys_help">Use a separate key for each job to see and limit what each one spends on platform.openai.com. Leave a key empty to use the default key. Keys are stored only on this computer.</p>
+      <div id="keys"></div>
+      <p class="muted small" id="settings-path"></p>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="models_title">AI models and voices</h2>
+      <div class="grid3">
+        <label class="field"><span><span class="dot role-analysis"></span> <span data-i18n="model_analysis">Analysis model (transcription)</span></span><input id="model-analysis" list="dl-analysis"></label>
+        <label class="field"><span><span class="dot role-script"></span> <span data-i18n="model_script">Script model (translation)</span></span><input id="model-script" list="dl-script"></label>
+        <label class="field"><span><span class="dot role-voice"></span> <span data-i18n="model_voice">Voice model (TTS)</span></span><input id="model-voice" list="dl-voice"></label>
+      </div>
+      <datalist id="dl-analysis"><option>whisper-1</option></datalist>
+      <datalist id="dl-script"><option>gpt-4.1-mini</option><option>gpt-4.1</option><option>gpt-4o-mini</option><option>gpt-4o</option><option>gpt-4.1-nano</option></datalist>
+      <datalist id="dl-voice"><option>gpt-4o-mini-tts</option><option>tts-1</option><option>tts-1-hd</option></datalist>
+      <div class="grid3">
+        <label class="field"><span><span class="dot role-script"></span> <span data-i18n="model_rewrite">Rewrite model (length fixes)</span></span><input id="model-rewrite" list="dl-rewrite" data-i18n-ph="model_rewrite_ph"></label>
+      </div>
+      <datalist id="dl-rewrite"><option>gpt-4.1-mini</option><option>gpt-4.1-nano</option><option>gpt-4o-mini</option></datalist>
+      <p class="muted small" data-i18n="analysis_model_note">The analysis model must return segment timestamps (whisper-1 does).</p>
+      <h3 data-i18n="voices_title">Voice for each language</h3>
+      <div class="voices" id="voices"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="timing_title">Timing</h2>
+      <div class="grid3" id="timing-fields"></div>
+    </div>
+
+    <div class="card" id="economy-card">
+      <h2 data-i18n="economy_title">Saving money</h2>
+      <p class="muted" data-i18n="economy_help">These options lower what each video costs without a noticeable change in the result.</p>
+      <label class="switch-row">
+        <input type="checkbox" id="economy-toggle">
+        <span class="switch" aria-hidden="true"></span>
+        <span><b data-i18n="economy_label">Economy mode (stretch first)</b><br><small data-i18n="economy_hint">A line that is a little too long or too short is just sped up or slowed down. It is only rewritten and voiced again when the speed change would be too big. Off = always rewrite first.</small></span>
+      </label>
+      <div class="grid3" id="economy-fields"></div>
+      <label class="switch-row">
+        <input type="checkbox" id="cache-toggle">
+        <span class="switch" aria-hidden="true"></span>
+        <span><b data-i18n="cache_label">Reuse what was already paid for (cache)</b><br><small data-i18n="cache_hint">Transcripts, translations and voice clips are kept on this computer. Re-running a video, or dubbing it into another language, does not pay twice.</small></span>
+      </label>
+      <div class="input-row cache-row">
+        <span class="muted" id="cache-info"></span>
+        <button class="btn btn-danger-ghost" id="clear-cache" data-i18n="clear_cache">Clear cache</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="output_title">Output folder</h2>
+      <div class="input-row">
+        <input id="output-dir" spellcheck="false">
+        <button class="btn" id="browse-output" data-i18n="browse">Browse...</button>
+        <button class="btn btn-ghost" id="open-output" data-i18n="open">Open</button>
+      </div>
+      <p class="muted small" data-i18n="output_hint">Empty = the "output" folder next to the app.</p>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="prices_title">Prices (estimates)</h2>
+      <p class="muted" data-i18n="prices_help">Used only to estimate spend. Check openai.com/api/pricing and correct them if needed. USD.</p>
+      <div class="table-wrap">
+        <table class="price-table">
+          <thead><tr><th data-i18n="price_model">Model</th><th data-i18n="price_minute">$ / audio minute</th><th data-i18n="price_in">$ / 1M input tokens</th><th data-i18n="price_out">$ / 1M output tokens</th><th data-i18n="price_chars">$ / 1M characters</th><th></th></tr></thead>
+          <tbody id="price-tbody"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-ghost" id="add-price" data-i18n="add_model">+ Add a model</button>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="counters_title">Spend counters</h2>
+      <p class="muted" data-i18n="counters_help">Counters are estimates computed on this computer. They do not replace your OpenAI invoice.</p>
+      <button class="btn btn-danger-ghost" id="reset-spend" data-i18n="reset_counters">Reset counters</button>
+    </div>
+
+    <div class="save-bar">
+      <span id="save-msg" class="muted"></span>
+      <button class="btn btn-ghost" id="reload-settings" data-i18n="discard">Discard changes</button>
+      <button class="btn btn-primary" id="save-settings" data-i18n="save">Save settings</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<dialog id="seg-dialog">
+  <div class="dialog-head">
+    <h2 id="sd-title"></h2>
+    <button class="icon-btn" id="sd-close" aria-label="Close">✕</button>
+  </div>
+  <div id="sd-body"></div>
+</dialog>
+
+<div class="overlay" id="offline-overlay" hidden>
+  <div class="card">
+    <h2 id="offline-title" data-i18n="stopped_title">The app is stopped</h2>
+    <p data-i18n="stopped_text">You can close this window. To start again, double-click run.bat.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
